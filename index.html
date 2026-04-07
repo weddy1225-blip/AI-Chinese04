@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>語詞實驗室</title>
+    <style>
+        :root {
+            --main-purple: #6c5ce7;
+            --soft-blue: #81ecec;
+            --soft-pink: #ffaaa5;
+            --gold: #fdcb6e;
+            --mint: #55efc4;
+            --bg: #fffbf0;
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: "Microsoft JhengHei", "BiauKai", sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0; overflow: hidden; color: #2d3436;
+        }
+
+        #game-board {
+            width: 920px; min-height: 680px; background: white;
+            border: 8px solid var(--main-purple); border-radius: 40px;
+            box-shadow: 0 15px 0 #a29bfe; padding: 30px; text-align: center; position: relative;
+        }
+
+        .hidden { display: none !important; }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.98); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border-radius: 32px;
+        }
+
+        .info-card {
+            background: #f0f3ff; padding: 25px; border-radius: 25px;
+            width: 85%; border: 3px solid var(--main-purple); margin-bottom: 20px;
+            text-align: left; line-height: 1.8;
+        }
+
+        /* 第一關佈局優化 */
+        .lab-layout {
+            display: grid; grid-template-columns: 280px 1fr 280px;
+            align-items: stretch; gap: 15px; margin-top: 20px;
+        }
+
+        .cabinet { 
+            padding: 20px; border-radius: 25px; min-height: 400px; 
+            border: 5px solid transparent; position: relative;
+            display: flex; flex-direction: column; /* 讓內容可以撐開 */
+        }
+
+        .cab-label { 
+            position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+            background: white; padding: 2px 15px; border-radius: 10px; font-weight: bold; font-size: 18px; z-index: 2;
+        }
+
+        #cab-left { border-color: var(--soft-blue); background: #f0ffff; }
+        #cab-left .cab-label { border: 2px solid var(--soft-blue); color: #0984e3; }
+        #cab-right { border-color: var(--soft-pink); background: #fff5f5; }
+        #cab-right .cab-label { border: 2px solid var(--soft-pink); color: #e84393; }
+
+        /* 選項容器：置中關鍵 */
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+            justify-items: center;
+            align-content: center; /* 讓網格內容垂直置中 */
+            flex-grow: 1; /* 佔滿剩餘高度 */
+        }
+
+        .item-btn {
+            width: 85px; height: 85px; border: none; border-radius: 20px; 
+            font-size: 36px; cursor: pointer; background: white; 
+            box-shadow: 0 6px 0 rgba(0,0,0,0.1); transition: 0.2s;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .item-btn:hover { background: #f9f9f9; transform: translateY(-2px); }
+        .item-btn.selected { outline: 5px solid var(--main-purple); transform: scale(0.95); background: #efecff; box-shadow: none; }
+
+        #pot-area { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #pot {
+            width: 170px; height: 170px; background: radial-gradient(circle, #fff, #ffeaa7);
+            border: 8px double var(--gold); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 70px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .btn { border: none; border-radius: 15px; font-size: 24px; padding: 12px; cursor: pointer; transition: 0.2s; }
+        .btn-purple { background: var(--main-purple); color: white; padding: 12px 35px; }
+
+        #sentence-box {
+            background: #f0f3ff; padding: 30px; border-radius: 25px; font-size: 32px; 
+            margin: 40px auto; width: 85%; min-height: 180px;
+            display: flex; justify-content: center; align-items: center;
+            text-align: center; border: 3px solid #cbd5e0;
+        }
+
+        .report-group { margin-bottom: 25px; border-bottom: 2px dashed #ccc; padding-bottom: 15px; }
+        .report-chars { color: var(--main-purple); font-weight: bold; font-size: 1.2em; margin: 10px 0; text-align: left;}
+        .wrong-item { color: #d63031; background: #fff0f0; padding: 8px; border-radius: 8px; margin: 5px 0; font-size: 0.95em; text-align: left;}
+
+        .bounce { animation: bounce 0.6s ease-in-out; }
+        @keyframes bounce { 0%, 100% {transform: scale(1);} 50% {transform: scale(1.3); color: var(--main-purple);} }
+        .shake { animation: shake 0.4s; }
+        @keyframes shake { 0%, 100% {transform: translateX(0);} 25% {transform: translateX(-10px);} 75% {transform: translateX(10px);} }
+    </style>
+</head>
+<body>
+
+<div id="game-board">
+    <div id="welcome-screen" class="overlay">
+        <h1 style="color:var(--main-purple); font-size: 38px;">🧪 語詞實驗室</h1>
+        <div class="info-card">
+            <p><b>第一關【字形合成】：</b>點選<b>部首瓶</b>與<b>材料瓶</b>合成生字。</p>
+            <p><b>第二關【詞語提煉】：</b>選出正確的字完成詞語填空。</p>
+            <p><b>第三關【配方鑑定】：</b>判斷句子中的語詞用法是否正確。</p>
+        </div>
+        <button class="btn btn-purple" onclick="initGame()">進入實驗室 ➔</button>
+    </div>
+
+    <div id="report-screen" class="overlay hidden">
+        <h1 style="color:var(--main-purple);">📋 實驗終期報告</h1>
+        <div class="info-card" id="report-content" style="max-height: 450px; overflow-y: auto; background: white;"></div>
+        <button class="btn btn-purple" onclick="location.reload()">重新開始</button>
+    </div>
+
+    <div id="main-content">
+        <h1 id="stage-title" style="color:var(--main-purple);">準備中...</h1>
+        <div id="progress-text">進度：0 / 4</div>
+        <div style="width:80%; margin:10px auto; background:#eee; height:15px; border-radius:10px; overflow:hidden;">
+            <div id="bar-fill" style="height:100%; background:var(--mint); width:0%; transition:0.5s;"></div>
+        </div>
+        <div id="msg-display" style="height:30px; font-weight:bold; margin-top:10px;"></div>
+
+        <div id="phase1-ui" class="lab-layout">
+            <div class="cabinet" id="cab-left">
+                <div class="cab-label">🧪 部首瓶</div>
+                <div class="grid" id="left-grid"></div>
+            </div>
+            <div id="pot-area">
+                <div id="pot">?</div>
+                <p style="font-weight:bold; color:var(--gold); margin-top:10px;">魔法鍊金爐</p>
+            </div>
+            <div class="cabinet" id="cab-right">
+                <div class="cab-label">📦 材料瓶</div>
+                <div class="grid" id="right-grid"></div>
+            </div>
+        </div>
+
+        <div id="phase2-ui" class="hidden">
+            <div style="font-size:55px; margin:40px;"><span id="word-prefix"></span>＿<span id="word-suffix"></span></div>
+            <div id="phase2-options" style="display:flex; justify-content:center; gap:20px;"></div>
+        </div>
+
+        <div id="phase3-ui" class="hidden">
+            <div id="sentence-box"></div>
+            <div style="display:flex; justify-content:center; gap:30px;">
+                <button class="btn" style="background:var(--mint); color:white;" onclick="checkP3(true)">正確</button>
+                <button class="btn" style="background:var(--soft-pink); color:white;" onclick="checkP3(false)">有錯誤</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 遊戲數據
+    const allData = [
+        [ 
+            { char: '漫', l: '氵', r: '曼', prefix: '', suffix: '步', opts: ['漫', '慢', '蔓'], sentence: '他在公園裡「慢」步，呼吸新鮮空氣。', isCorrect: false },
+            { char: '轉', l: '車', r: '專', prefix: '旋', suffix: '', opts: ['轉', '傳', '專'], sentence: '風車在強風中快速「轉」動。', isCorrect: true },
+            { char: '緩', l: '糸', r: '爰', prefix: '', suffix: '慢', opts: ['緩', '暖', '爰'], sentence: '火車進站的速度非常「緩」慢。', isCorrect: true },
+            { char: '礁', l: '石', r: '焦', prefix: '', suffix: '石', opts: ['礁', '瞧', '蕉'], sentence: '海浪拍打在岸邊的「蕉」石上。', isCorrect: false }
+        ],
+        [ 
+            { char: '編', l: '糸', r: '扁', prefix: '', suffix: '織', opts: ['編', '偏', '篇'], sentence: '奶奶正在「編」織毛衣。', isCorrect: true },
+            { char: '境', l: '土', r: '竟', prefix: '環', suffix: '', opts: ['境', '鏡', '競'], sentence: '這裡的環「鏡」很優美。', isCorrect: false },
+            { char: '導', l: '寸', r: '道', prefix: '', suffix: '遊', opts: ['導', '道', '倒'], sentence: '「導」遊正熱心地介紹風景。', isCorrect: true },
+            { char: '慕', l: '心', r: '莫', prefix: '羨', suffix: '', opts: ['慕', '募', '幕'], sentence: '他非常羨「幕」別人的才華。', isCorrect: false }
+        ],
+        [ 
+            { char: '揮', l: '手', r: '軍', prefix: '指', suffix: '', opts: ['揮', '渾', '輝'], sentence: '指揮家在台上「揮」動指揮棒。', isCorrect: true },
+            { char: '署', l: '网', r: '者', prefix: '簽', suffix: '', opts: ['署', '暑', '薯'], sentence: '他在文件上完成簽「署」手續。', isCorrect: true },
+            { char: '既', l: '旡', r: '皀', prefix: '', suffix: '然', opts: ['既', '即', '慨'], sentence: '「既」然下雨了，就不出門。', isCorrect: true },
+            { char: '隔', l: '阜', r: '鬲', prefix: '間', suffix: '', opts: ['隔', '融', '格'], sentence: '我們和鄰居僅有一牆之「隔」。', isCorrect: true }
+        ]
+    ];
+
+    let gameGroups = [];
+    let gIdx = 0, qIdx = 0, collected = [], groupMistakes = [[], [], []];
+    let curL = '', curR = '';
+
+    function initGame() {
+        gameGroups = allData; 
+        document.getElementById('welcome-screen').classList.add('hidden');
+        startGroup();
+    }
+
+    function startGroup() {
+        collected = []; 
+        document.getElementById('phase3-ui').classList.add('hidden');
+        document.getElementById('phase1-ui').classList.remove('hidden');
+        document.getElementById('stage-title').innerText = `實驗組 ${gIdx+1}/3：字形合成`;
+        updateUI(0);
+        renderP1();
+    }
+
+    function renderP1() {
+        const lG = document.getElementById('left-grid'), rG = document.getElementById('right-grid');
+        lG.innerHTML = ''; rG.innerHTML = '';
+        const group = gameGroups[gIdx];
+        const ls = [...new Set(group.map(d=>d.l))].sort(()=>Math.random()-0.5);
+        const rs = [...new Set(group.map(d=>d.r))].sort(()=>Math.random()-0.5);
+        ls.forEach(l => lG.innerHTML += `<button class="item-btn" onclick="setL(this,'${l}')">${l}</button>`);
+        rs.forEach(r => rG.innerHTML += `<button class="item-btn" onclick="setR(this,'${r}')">${r}</button>`);
+    }
+
+    function setL(b, v) { document.querySelectorAll('#cab-left .item-btn').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); curL=v; checkP1(); }
+    function setR(b, v) { document.querySelectorAll('#cab-right .item-btn').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); curR=v; checkP1(); }
+
+    function checkP1() {
+        if(!curL || !curR) return;
+        const match = gameGroups[gIdx].find(d=>d.l===curL && d.r===curR);
+        const pot = document.getElementById('pot');
+        const msg = document.getElementById('msg-display');
+
+        if(match && !collected.includes(match.char)) {
+            collected.push(match.char); pot.innerText = match.char; pot.classList.add('bounce');
+            msg.innerText = "✨ 成功合成！"; msg.style.color = "var(--mint)";
+            updateUI(collected.length);
+            setTimeout(()=>{ 
+                pot.innerText='?'; pot.classList.remove('bounce'); resetBtns(); msg.innerText = "";
+                if(collected.length===4) startP2();
+            }, 1000);
+        } else {
+            pot.classList.add('shake');
+            msg.innerText = "❌ 配方不太對喔！"; msg.style.color = "#e84393";
+            groupMistakes[gIdx].push(`【第一關】嘗試組合 ${curL}+${curR} 但失敗。`);
+            setTimeout(()=>{ pot.classList.remove('shake'); resetBtns(); }, 600);
+        }
+    }
+
+    function resetBtns() { curL=''; curR=''; document.querySelectorAll('.item-btn').forEach(b=>b.classList.remove('selected')); }
+
+    function startP2() {
+        qIdx=0; document.getElementById('stage-title').innerText=`實驗組 ${gIdx+1}/3：詞語提煉`;
+        document.getElementById('phase1-ui').classList.add('hidden');
+        document.getElementById('phase2-ui').classList.remove('hidden');
+        renderP2();
+    }
+
+    function renderP2() {
+        const data = gameGroups[gIdx].find(d=>d.char===collected[qIdx]);
+        document.getElementById('word-prefix').innerText = data.prefix;
+        document.getElementById('word-suffix').innerText = data.suffix;
+        const opt = document.getElementById('phase2-options'); opt.innerHTML = '';
+        data.opts.forEach(o => opt.innerHTML += `<button class="btn btn-purple" onclick="checkP2('${o}','${data.char}')">${o}</button>`);
+    }
+
+    function checkP2(ans, cor) {
+        if(ans === cor) { qIdx++; if(qIdx<4) renderP2(); else startP3(); }
+        else { 
+            groupMistakes[gIdx].push(`【第二關】"${cor}"誤選為"${ans}"。`);
+            alert("再想想看，這個字不對喔！"); 
+        }
+    }
+
+    function startP3() {
+        qIdx=0; document.getElementById('stage-title').innerText=`實驗組 ${gIdx+1}/3：配方鑑定`;
+        document.getElementById('phase2-ui').classList.add('hidden');
+        document.getElementById('phase3-ui').classList.remove('hidden');
+        renderP3();
+    }
+
+    function renderP3() { 
+        document.getElementById('sentence-box').innerText = gameGroups[gIdx].find(d=>d.char===collected[qIdx]).sentence; 
+    }
+
+    function checkP3(ans) {
+        const data = gameGroups[gIdx].find(d=>d.char===collected[qIdx]);
+        if(ans === data.isCorrect) { 
+            qIdx++; 
+            if(qIdx<4) renderP3(); 
+            else { gIdx++; if(gIdx<3) startGroup(); else showReport(); }
+        } else {
+            groupMistakes[gIdx].push(`【第三關】判斷錯誤：${data.sentence}`);
+            alert("看仔細一點，鑑定結果不對喔！");
+        }
+    }
+
+    function showReport() {
+        document.getElementById('report-screen').classList.remove('hidden');
+        const container = document.getElementById('report-content');
+        let html = '';
+        gameGroups.forEach((group, i) => {
+            const chars = group.map(d => d.char).join('、');
+            html += `<div class="report-group">
+                <div style="font-weight:bold; color:#2d3436; text-align:left;">🧪 第 ${i+1} 組實驗生字：</div>
+                <div class="report-chars">${chars}</div>
+                <div style="font-size:0.9em; color:#636e72; text-align:left;">錯誤紀錄：</div>`;
+            if(groupMistakes[i].length === 0) html += `<div style="color:var(--mint); font-size:0.9em; text-align:left;">✔️ 完美達成！</div>`;
+            else groupMistakes[i].forEach(err => html += `<div class="wrong-item">${err}</div>`);
+            html += `</div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function updateUI(n) {
+        document.getElementById('bar-fill').style.width = (n/4)*100+'%';
+        document.getElementById('progress-text').innerText = `目前組內合成進度：${n} / 4`;
+    }
+</script>
+</body>
+</html>
